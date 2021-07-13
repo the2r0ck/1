@@ -1,12 +1,23 @@
-import sqlite3
+import pymysql
 import telebot
-import config
+from config import TOKEN, user, password, db_name, host
 
 
-conn = sqlite3.connect("Bot.db")
+try:
+	connection = pymysql.connect(
+			host = host,
+			user = user,
+			database = db_name,
+			password = password
+		)
+	print("Successfuly connected...")
+
+except Exception as e:
+	print("Connection refused...")
+	print(e)
 
 
-bot = telebot.TeleBot(config.TOKEN)
+bot = telebot.TeleBot(TOKEN)
 
 @bot.message_handler()
 def start(message):

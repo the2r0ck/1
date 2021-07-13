@@ -1,1 +1,5 @@
 TOKEN = "1847840572:AAHFyMdiNyrH3DSMV8J1xErhWSeGaY0JTcE"
+user = "okayokaybot"
+host = "localhost"
+password = "12345678"
+db_name = "botdb"
