@@ -1,7 +1,24 @@
 import requests
+import pymysql
+from config import user, host, password, db_name
 from bs4 import BeautifulSoup
 
-url = "https://coinmarketcap.com/"
+try:
+	connection = pymysql.connect(
+			host = host,
+			user = user,
+			database = db_name,
+			password = password
+		)
+	print("Successfuly connected...")
+
+except Exception as e:
+	print("Connection refused...")
+	print(e)
+
+cursor = connection.cursor()
+
+url = "https://coinmarketcap.com"
 
 headers = {
 	"Accept": "application/font-woff2;q=1.0,application/font-woff;q=0.9,*/*;q=0.8",
@@ -21,44 +38,46 @@ with open("coinmarketcap.html", 'w') as file:
 # print(src)
 soup = BeautifulSoup(src, "lxml")
 
+coins = soup.find("tbody").find_all("tr")
+db_data = [[] for i in range(len(coins[0:10]))]
 
-top10_coins = [[] for i in range(11)]
+for item in coins[0:10]:
+	element = coins[coins.index(item)].find_all("td")
+	
+	#top
+	top = element[1].text
+	db_data[coins.index(item)].append(top)
 
-coins = soup.find_all('tr')
+	#name
+	long_short_name = element[2].find_all('p')
+	name = long_short_name[0].text
+	db_data[coins.index(item)].append(name)
 
-for i in range(11):
-	if i == 0:
-		pass
+	#short_name
+	short_name = long_short_name[1].text
+	db_data[coins.index(item)].append(short_name)
+
+	#price
+	price = element[3].text
+	db_data[coins.index(item)].append(price)
+
+	#24_hours
+	h24_ = element[4].find('span', class_=["sc-15yy2pl-0 hzgCfk", "sc-15yy2pl-0 kAXKAX"])
+	if len(h24_.find_all(class_="icon-Caret-down")) == 1:
+		h24 = '-' + h24_.text
 	else:
-		
-		top = coins[i].find('p', class_="sc-1eb5slv-0 etpvrL")
-		top10_coins[i].append(top.text)
+		h24 = '+' + h24_.text
+	db_data[coins.index(item)].append(h24)
+	
+	#7_days
+	d7_ = element[5].find('span', class_=["sc-15yy2pl-0 hzgCfk", "sc-15yy2pl-0 kAXKAX"])
+	if len(h24_.find_all(class_="icon-Caret-down")) == 1:
+		d7 = '-' + d7_.text
+	else:
+		d7 = '+' + d7_.text
+	db_data[coins.index(item)].append(d7)
 
-		
-		name = coins[i].find('p', class_="sc-1eb5slv-0 iJjGCS")
-		top10_coins[i].append(name.text)
-
-		
-		short_name = coins[i].find('p', class_="sc-1eb5slv-0 gGIpIK coin-item-symbol")
-		top10_coins[i].append(short_name.text)
-
-		
-		price = coins[i].find_all('a', class_="cmc-link")
-		top10_coins[i].append(price[1].text)
-
-		
-		h24_day7 = coins[i].find_all('span', class_=["sc-15yy2pl-0 hzgCfk", "sc-15yy2pl-0 kAXKAX"])
-
-		if str(h24_day7[0].next_element) == "<span class=\"icon-Caret-down\"></span>":
-			top10_coins[i].append("-" + h24_day7[0].text)
-		else:
-			top10_coins[i].append("+" + h24_day7[0].text)
-		
-		if str(h24_day7[1].next_element) == "<span class=\"icon-Caret-down\"></span>":
-			top10_coins[i].append("-" + h24_day7[1].text)
-		else:
-			top10_coins[i].append("+" + h24_day7[1].text)
-
-		
-
-print(top10_coins)
+for item in db_data:
+	execute = f"INSERT INTO crypto (id, name,	short_name, price, change_in_24_hours, change_in_7_days) VALUES('{item[0]}', '{item[1]}', '{item[2]}', '{item[3]}', '{item[4]}', '{item[5]}')"
+	cursor.execute(execute)
+connection.commit()
