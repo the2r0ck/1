@@ -1,83 +1,83 @@
-import requests
 import pymysql
-from config import user, host, password, db_name
 from bs4 import BeautifulSoup
+import config
+from selenium import webdriver
+from selenium.webdriver.common.keys import Keys
+import time
 
+url = 'https://coinmarketcap.com/?page='
+coins_data = []
+
+
+def db_connect(user, host, password, db_name):
+	try:
+		connection = pymysql.connect(
+				host = config.host,
+				user = config.user,
+				database = config.db_name,
+				password = config.password
+			)
+		print("Successfuly connected...")
+
+	except Exception as e:
+		print("Connection refused...")
+		print(e)
+
+	cursor = connection.cursor()
+	return cursor
+
+
+def get_driver(user_agent, driver_location):	
+	options = webdriver.ChromeOptions()
+	options.add_argument("user-agent=" + user_agent)
+	options.add_argument('--disable-blink-features=AutomationControlled')
+	options.headless = True
+
+
+	driver = webdriver.Chrome(options=options, executable_path=driver_location)
+	return driver
+
+
+driver = get_driver(user_agent=config.user_agent, driver_location=config.driver_location)
 try:
-	connection = pymysql.connect(
-			host = host,
-			user = user,
-			database = db_name,
-			password = password
-		)
-	print("Successfuly connected...")
+	for i in range(1, 62):
+		driver.get(url + str(i))
+		for i in range(20):
+			driver.find_element_by_tag_name('html').send_keys(Keys.PAGE_DOWN)
+			time.sleep(0.5)
+
+		src = driver.page_source	
+		soup = BeautifulSoup(src, 'lxml')
+
+		table = soup.find('tbody')
+		table_rows = table.find_all('tr')
+
+		for item in table_rows:
+			table_column = item.find_all('td')[2]
+			coin_data = []
+			
+			top = table_column.find(class_='etWhyV').text
+			coin_data.append(top)
+
+			long_name = table_column.find(class_='iJjGCS').text
+			coin_data.append(long_name)
+
+			short_name = table_column.find(class_='gGIpIK').text
+			coin_data.append(short_name)
+
+			link = 'https://coinmarketcap.com' + table_column.find('a').get('href')
+			coin_data.append(link)
+
+			coins_data.append(coin_data)
+
 
 except Exception as e:
-	print("Connection refused...")
 	print(e)
+finally:
+	driver.close()
+	driver.quit()
 
-cursor = connection.cursor()
 
-url = "https://coinmarketcap.com"
-
-headers = {
-	"Accept": "application/font-woff2;q=1.0,application/font-woff;q=0.9,*/*;q=0.8",
-	"User-Agent": "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:90.0) Gecko/20100101 Firefox/90.0"
-}
-
-req = requests.get(url, headers=headers)
-
-src = req.text
-# print(src)
-
-with open("coinmarketcap.html", 'w') as file:
-	file.write(src)
-
-# with open("coinmarketcap.html") as file:
-# 	src = file.read()
-# print(src)
-soup = BeautifulSoup(src, "lxml")
-
-coins = soup.find("tbody").find_all("tr")
-db_data = [[] for i in range(len(coins[0:10]))]
-
-for item in coins[0:10]:
-	element = coins[coins.index(item)].find_all("td")
-	
-	#top
-	top = element[1].text
-	db_data[coins.index(item)].append(top)
-
-	#name
-	long_short_name = element[2].find_all('p')
-	name = long_short_name[0].text
-	db_data[coins.index(item)].append(name)
-
-	#short_name
-	short_name = long_short_name[1].text
-	db_data[coins.index(item)].append(short_name)
-
-	#price
-	price = element[3].text
-	db_data[coins.index(item)].append(price)
-
-	#24_hours
-	h24_ = element[4].find('span', class_=["sc-15yy2pl-0 hzgCfk", "sc-15yy2pl-0 kAXKAX"])
-	if len(h24_.find_all(class_="icon-Caret-down")) == 1:
-		h24 = '-' + h24_.text
-	else:
-		h24 = '+' + h24_.text
-	db_data[coins.index(item)].append(h24)
-	
-	#7_days
-	d7_ = element[5].find('span', class_=["sc-15yy2pl-0 hzgCfk", "sc-15yy2pl-0 kAXKAX"])
-	if len(h24_.find_all(class_="icon-Caret-down")) == 1:
-		d7 = '-' + d7_.text
-	else:
-		d7 = '+' + d7_.text
-	db_data[coins.index(item)].append(d7)
-
-for item in db_data:
-	execute = f"INSERT INTO crypto (id, name,	short_name, price, change_in_24_hours, change_in_7_days) VALUES('{item[0]}', '{item[1]}', '{item[2]}', '{item[3]}', '{item[4]}', '{item[5]}')"
-	cursor.execute(execute)
-connection.commit()
+for item in coins_data:
+	with open('coin_data.txt', 'a') as file:
+		file.write(str(item) + '\n')
