@@ -9,7 +9,7 @@ url = 'https://coinmarketcap.com/?page='
 coins_data = []
 
 
-def db_connect(user, host, password, db_name):
+def db_data(coins_data):
 	try:
 		connection = pymysql.connect(
 				host = config.host,
@@ -24,7 +24,15 @@ def db_connect(user, host, password, db_name):
 		print(e)
 
 	cursor = connection.cursor()
-	return cursor
+	id_ = 1
+	for item in coins_data:
+		execute = f"INSERT INTO Coins_bio(id, full_name, short_name, link, coin_id, top) VALUES(\"{id_}\", \"{item[2]}\", \"{item[3]}\", \"{item[4]}\", \"{item[0]}\", {item[1]})"
+		print(execute)
+		cursor.execute(execute)
+		id_ += 1
+
+	connection.commit()
+
 
 
 def get_driver(user_agent, driver_location):	
@@ -40,7 +48,8 @@ def get_driver(user_agent, driver_location):
 
 driver = get_driver(user_agent=config.user_agent, driver_location=config.driver_location)
 try:
-	for i in range(1, 62):
+	pages = int(input("Enter number of pages: "))
+	for i in range(1, pages+1):
 		driver.get(url + str(i))
 		for i in range(20):
 			driver.find_element_by_tag_name('html').send_keys(Keys.PAGE_DOWN)
@@ -56,10 +65,13 @@ try:
 			table_column = item.find_all('td')[2]
 			coin_data = []
 			
-			top = table_column.find(class_='etWhyV').text
+			coin_id = table_column.find('img').get('src').split('/')[-1][:-4]
+			coin_data.append(coin_id)
+
+			top = int(table_column.find(class_='etWhyV').text)
 			coin_data.append(top)
 
-			long_name = table_column.find(class_='iJjGCS').text
+			long_name = table_column.find(class_='iworPT').text
 			coin_data.append(long_name)
 
 			short_name = table_column.find(class_='gGIpIK').text
@@ -72,7 +84,8 @@ try:
 
 
 except Exception as e:
-	print(e)
+	raise e
+
 finally:
 	driver.close()
 	driver.quit()
@@ -81,3 +94,6 @@ finally:
 for item in coins_data:
 	with open('coin_data.txt', 'a') as file:
 		file.write(str(item) + '\n')
+
+
+db_data(coins_data)
